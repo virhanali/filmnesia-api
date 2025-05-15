@@ -9,13 +9,17 @@ import (
 )
 
 type Config struct {
-	ServicePort string `mapstructure:"USER_SERVICE_PORT"`
-	DBHost      string `mapstructure:"DB_HOST"`
-	DBPort      string `mapstructure:"DB_PORT"`
-	DBUser      string `mapstructure:"DB_USER"`
-	DBPassword  string `mapstructure:"DB_PASSWORD"`
-	DBName      string `mapstructure:"DB_NAME"`
-	DBSSLMode   string `mapstructure:"DB_SSLMODE"`
+	ServicePort        string `mapstructure:"USER_SERVICE_PORT"`
+	
+	DBHost             string `mapstructure:"DB_HOST"`
+	DBPort             string `mapstructure:"DB_PORT"`
+	DBUser             string `mapstructure:"DB_USER"`
+	DBPassword         string `mapstructure:"DB_PASSWORD"`
+	DBName             string `mapstructure:"DB_NAME"`
+	DBSSLMode          string `mapstructure:"DB_SSLMODE"`
+	
+	JWTSecretKey       string `mapstructure:"JWT_SECRET_KEY"`
+	JWTExpirationHours int    `mapstructure:"JWT_EXPIRATION_HOURS"`
 }
 
 func LoadConfig(configPath string) (config Config, err error) {

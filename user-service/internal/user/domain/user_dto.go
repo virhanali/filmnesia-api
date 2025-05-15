@@ -3,6 +3,7 @@ package domain
 import (
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -18,6 +19,22 @@ type UpdateUserRequest struct {
 	Password *string `json:"password,omitempty" binding:"omitempty,min=6,max=72"`
 }
 
+type LoginUserRequest struct {
+	Email    *string `json:"email,omitempty" binding:"omitempty,email"`
+	Username *string `json:"username,omitempty" binding:"omitempty,alphanum"`
+	Password string  `json:"password" binding:"required,min=6,max=72"`
+}
+
+type LoginUserResponse struct {
+	AccessToken string       `json:"access_token"`
+	User        UserResponse `json:"user"`
+}
+
+type AppClaims struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	jwt.RegisteredClaims
+}
 type UserResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Username  string    `json:"username"`
