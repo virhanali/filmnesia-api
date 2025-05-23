@@ -115,7 +115,7 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 		switch err {
 		case usecase.ErrUserNotFound:
 			c.JSON(http.StatusNotFound, gin.H{"error": usecase.ErrUserNotFound.Error()})
-		case usecase.ErrInvalidInput: // Jika usecase melakukan validasi format username
+		case usecase.ErrInvalidInput:
 			c.JSON(http.StatusBadRequest, gin.H{"error": usecase.ErrInvalidInput.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user data by username"})
@@ -145,7 +145,18 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	if authUserID != targetUserID {
+	authUserRoleValue, roleExists := c.Get(AuthUserRoleKey)
+	if !roleExists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User role not found in token context"})
+		return
+	}
+	authUserRole, roleOk := authUserRoleValue.(string)
+	if !roleOk {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User role in token context is of invalid type"})
+		return
+	}
+
+	if authUserRole != "admin" && authUserID != targetUserID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to update this user profile"})
 		return
 	}
@@ -195,7 +206,18 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	if authUserID != targetUserID {
+	authUserRoleValue, roleExists := c.Get(AuthUserRoleKey)
+	if !roleExists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User role not found in token context"})
+		return
+	}
+	authUserRole, roleOk := authUserRoleValue.(string)
+	if !roleOk {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User role in token context is of invalid type"})
+		return
+	}
+
+	if authUserRole != "admin" && authUserID != targetUserID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to delete this user profile"})
 		return
 	}
