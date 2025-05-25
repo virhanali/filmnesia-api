@@ -20,6 +20,8 @@ type Config struct {
 	
 	JWTSecretKey       string `mapstructure:"JWT_SECRET_KEY"`
 	JWTExpirationHours int    `mapstructure:"JWT_EXPIRATION_HOURS"`
+
+	RabbitMQURL string `mapstructure:"RABBITMQ_URL"`
 }
 
 func LoadConfig(configPath string) (config Config, err error) {
@@ -49,6 +51,11 @@ func LoadConfig(configPath string) (config Config, err error) {
 	if config.ServicePort == "" || config.DBHost == "" || config.DBUser == "" || config.DBName == "" {
 		log.Println("Error: One or more required config fields are empty after loading from .env.")
 		return Config{}, errors.New("required config fields are empty in .env")
+	}
+
+	if config.RabbitMQURL == "" {
+		log.Println("Error: RabbitMQURL is empty after loading from .env.")
+		return Config{}, errors.New("RabbitMQURL is empty in .env")
 	}
 
 	log.Printf("Successfully loaded config from '%s/.env'", configPath)

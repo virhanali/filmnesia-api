@@ -2,7 +2,10 @@ module github.com/virhanali/filmnesia/user-service
 
 go 1.24.3
 
-require github.com/google/uuid v1.6.0
+require (
+	github.com/google/uuid v1.6.0
+	github.com/rabbitmq/amqp091-go v1.10.0
+)
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect

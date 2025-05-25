@@ -15,15 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/virhanali/filmnesia/user-service/internal/config"
 	"github.com/virhanali/filmnesia/user-service/internal/platform/database"
+	"github.com/virhanali/filmnesia/user-service/internal/platform/messagebroker"
 	userHttp "github.com/virhanali/filmnesia/user-service/internal/user/delivery/http"
 	userRepo "github.com/virhanali/filmnesia/user-service/internal/user/repository"
 	userUsecase "github.com/virhanali/filmnesia/user-service/internal/user/usecase"
 )
 
 type App struct {
-	Config config.Config
-	DB     *sql.DB
-	Router *gin.Engine
+	Config    config.Config
+	DB        *sql.DB
+	Router    *gin.Engine
+	Publisher *messagebroker.RabbitMQPublisher
 }
 
 func NewApp(configPath string) (*App, error) {
@@ -40,12 +42,23 @@ func NewApp(configPath string) (*App, error) {
 		cfg.JWTExpirationHours = 24
 	}
 
+	if cfg.RabbitMQURL == "" {
+		log.Println("WARNING: RabbitMQURL is empty in configuration. Skipping RabbitMQ publisher initialization.")
+	}
+
 	db, err := database.NewPostgresSQLDB(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
+
+	publisher, err := messagebroker.NewRabbitMQPublisher(cfg)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to initialize RabbitMQ publisher: %w", err)
+	}
+
 	pgUserRepo := userRepo.NewPostgresUserRepository(db)
-	ucase := userUsecase.NewUserUsecase(pgUserRepo, cfg)
+	ucase := userUsecase.NewUserUsecase(pgUserRepo, cfg, publisher)
 	userHandler := userHttp.NewUserHandler(ucase)
 
 	router := gin.Default()
@@ -86,13 +99,19 @@ func NewApp(configPath string) (*App, error) {
 }
 
 func (a *App) Run() {
-	defer func() {
-		if err := a.DB.Close(); err != nil {
-			log.Printf("WARNING: Failed to close database connection: %v", err)
-		} else {
-			log.Println("Database connection closed.")
-		}
-	}()
+
+	if a.Publisher != nil {
+		defer a.Publisher.Close()
+	}
+	if a.DB != nil {
+		defer func() {
+			if err := a.DB.Close(); err != nil {
+				log.Printf("WARNING: Failed to close database connection: %v", err)
+			} else {
+				log.Println("Database connection closed.")
+			}
+		}()
+	}
 
 	serverAddr := ":" + a.Config.ServicePort
 	srv := &http.Server{

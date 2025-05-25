@@ -11,6 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/virhanali/filmnesia/user-service/internal/config"
 	"github.com/virhanali/filmnesia/user-service/internal/platform/hash"
+	"github.com/virhanali/filmnesia/user-service/internal/platform/messagebroker"
 	"github.com/virhanali/filmnesia/user-service/internal/user/domain"
 	"github.com/virhanali/filmnesia/user-service/internal/user/repository"
 
@@ -38,12 +39,14 @@ type UserUsecase interface {
 type userUsecase struct {
 	userRepo  repository.UserRepository
 	appConfig config.Config
+	publisher *messagebroker.RabbitMQPublisher
 }
 
-func NewUserUsecase(repo repository.UserRepository, appConfig config.Config) UserUsecase {
+func NewUserUsecase(repo repository.UserRepository, appConfig config.Config, publisher *messagebroker.RabbitMQPublisher) UserUsecase {
 	return &userUsecase{
 		userRepo:  repo,
 		appConfig: appConfig,
+		publisher: publisher,
 	}
 }
 
@@ -90,6 +93,25 @@ func (uc *userUsecase) Register(ctx context.Context, req domain.RegisterUserRequ
 	if err != nil {
 		log.Printf("Error creating user: %v", err)
 		return nil, err
+	}
+
+	if uc.publisher != nil {
+		event := domain.UserRegisteredEvent{
+			UserID:       createdUser.ID,
+			Email:        createdUser.Email,
+			Username:     createdUser.Username,
+			RegisteredAt: time.Now(),
+		}
+
+		exchangeName := "user_events"
+		routingKey := "user.registered"
+
+		err := uc.publisher.PublishUserRegisteredEvent(ctx, exchangeName, routingKey, event)
+		if err != nil {
+			log.Printf("Error publishing user registered event: %v", err)
+		} else {
+			log.Printf("User registered event published successfully.")
+		}
 	}
 
 	return createdUser.ToUserResponse(), nil

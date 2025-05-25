@@ -15,3 +15,10 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
+
+type UserRegisteredEvent struct {
+	UserID       uuid.UUID `json:"user_id"`
+	Email        string    `json:"email"`
+	Username     string    `json:"username"`
+	RegisteredAt time.Time `json:"registered_at"`
+}
