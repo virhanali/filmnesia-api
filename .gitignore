@@ -1,3 +1,4 @@
 /.env
 /.gitkeep
 user-service/.env
+notification-service/.env
