@@ -1,0 +1,110 @@
+services:
+  users_db:
+    image: postgres:16-alpine
+    container_name: filmnesia_users_db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME_USER_SERVICE}
+    ports:
+      - "${DB_PORT_HOST_USER_SERVICE:-5433}:5432"
+    volumes:
+      - users_db_data:/var/lib/postgresql/data
+    networks:
+      - filmnesia_network
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: filmnesia_rabbitmq
+    ports:
+      - "${RABBITMQ_PORT_AMQP:-5672}:5672"
+      - "${RABBITMQ_PORT_UI:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - filmnesia_network
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_BROKER_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_BROKER_PASS}
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      - users_db
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://admin:secret@users_db:5432/filmnesia?sslmode=disable",
+      "up"
+    ]
+    volumes:
+      - ./user-service/migrations:/migrations
+    networks:
+      - filmnesia_network
+      
+  user_service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: filmnesia_user_service
+    environment:
+      USER_SERVICE_PORT: ${USER_SERVICE_PORT:-8081}
+      DB_HOST: users_db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME_USER_SERVICE}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS}
+      RABBITMQ_URL: amqp://${RABBITMQ_BROKER_USER}:${RABBITMQ_BROKER_PASS}@rabbitmq:5672/
+    ports:
+      - "${USER_SERVICE_PORT_HOST:-8081}:${USER_SERVICE_PORT:-8081}"
+    depends_on:
+      users_db:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - filmnesia_network
+    restart: unless-stopped
+
+  notification_service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: filmnesia_notification_service
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_BROKER_USER:-guest}:${RABBITMQ_BROKER_PASS:-guest}@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_started
+    networks:
+      - filmnesia_network
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: filmnesia_api_gateway
+    environment:
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT:-8000}
+      USER_SERVICE_URL: http://user_service:${USER_SERVICE_PORT:-8081}
+    ports:
+      - "${API_GATEWAY_PORT_HOST:-8000}:${API_GATEWAY_PORT:-8000}"
+    depends_on:
+      user_service:
+        condition: service_started
+    networks:
+      - filmnesia_network
+    restart: unless-stopped
+
+networks:
+  filmnesia_network:
+    driver: bridge
+volumes:
+  users_db_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
