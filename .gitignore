@@ -2,3 +2,4 @@
 /.gitkeep
 user-service/.env
 notification-service/.env
+api-gateway/.env
